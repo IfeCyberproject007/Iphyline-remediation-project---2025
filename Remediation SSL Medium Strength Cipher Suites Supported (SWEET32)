@@ -1,0 +1,52 @@
+<#
+.SYNOPSIS
+  Disables weak/medium strength SSL/TLS ciphers (e.g., 3DES, RC4) on Windows Server
+
+.DESCRIPTION
+  - Modifies registry to disable 3DES and RC4 ciphers
+  - Enforces strong cipher suites order (AES, AES-GCM, etc.)
+  - Requires reboot to take full effect
+  - MECM/Intune deployment-ready
+#>
+
+Write-Output "Starting SSL/TLS Cipher Hardening..."
+
+# Disable 3DES and RC4 (Medium strength ciphers)
+$Ciphers = @(
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\Triple DES 168",
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\RC4 128/128",
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\RC4 64/128",
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\RC4 56/128",
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers\RC4 40/128"
+)
+
+foreach ($Cipher in $Ciphers) {
+    if (-not (Test-Path $Cipher)) {
+        New-Item -Path $Cipher -Force | Out-Null
+    }
+    New-ItemProperty -Path $Cipher -Name "Enabled" -Value 0 -PropertyType "DWord" -Force | Out-Null
+    Write-Output "Disabled $Cipher"
+}
+
+# Enforce strong cipher suite order
+$CipherSuites = @(
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_AES_128_GCM_SHA256",
+    "TLS_CHACHA20_POLY1305_SHA256",
+    "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+    "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+    "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+)
+
+$CipherSuitesString = [string]::Join(",", $CipherSuites)
+
+New-ItemProperty `
+  -Path "HKLM:\SOFTWARE\Policies\Microsoft\Cryptography\Configuration\SSL\00010002" `
+  -Name "Functions" `
+  -Value $CipherSuitesString `
+  -PropertyType "String" -Force | Out-Null
+
+Write-Output "Applied strong cipher suite order"
+
+Write-Output "Cipher remediation complete. A system reboot is required."
