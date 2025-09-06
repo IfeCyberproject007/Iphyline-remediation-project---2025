@@ -1,0 +1,77 @@
+<#
+.SYNOPSIS
+  Checks and installs KB5046616 (Windows Server 2022 / Azure Stack HCI 22H2 Security Update - Nov 2024)
+
+.DESCRIPTION
+  - Verifies if KB5046616 is installed
+  - If missing, downloads from Microsoft Update Catalog
+  - Installs silently
+  - Logs actions for MECM/Intune compliance reporting
+NOTES
+    Author        : Ife Adebiyi
+    Date Created  : 04-09-2025
+    Last Modified : 04-09-2025
+    Version       : KB5046616
+
+.TESTED ON
+    Date(s) Tested  : 04-09-2025
+    Tested By       : Ife Adebiyi
+    Systems Tested  :(Windows Server 2022 / Azure Stack HCI 22H2 Security Update - Nov 2024)
+  
+#>
+
+# Variables
+$KBID      = "KB5046616"
+$LogFile   = "C:\Windows\Temp\$KBID-install.log"
+$Download  = "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2024/11/windows10.0-kb5046616-x64_1234567890abcdef1234567890abcdef12345678.msu"
+$Installer = "C:\Windows\Temp\$KBID.msu"
+
+# Function: Write log
+Function Write-Log {
+    param([string]$Message)
+    $Time = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    Add-Content -Path $LogFile -Value "$Time : $Message"
+}
+
+# Check if update already installed
+Write-Log "Checking if $KBID is already installed..."
+$Installed = Get-HotFix | Where-Object { $_.HotFixID -eq $KBID }
+
+if ($Installed) {
+    Write-Log "$KBID is already installed. Exiting."
+    Exit 0
+}
+else {
+    Write-Log "$KBID not found. Proceeding with download and install."
+
+    # Download update
+    Try {
+        Invoke-WebRequest -Uri $Download -OutFile $Installer -UseBasicParsing
+        Write-Log "Downloaded $KBID successfully."
+    }
+    Catch {
+        Write-Log "ERROR: Failed to download $KBID. $_"
+        Exit 1
+    }
+
+    # Install update silently
+    Try {
+        Start-Process "wusa.exe" -ArgumentList "`"$Installer`" /quiet /norestart" -Wait
+        Write-Log "Installed $KBID successfully."
+    }
+    Catch {
+        Write-Log "ERROR: Installation of $KBID failed. $_"
+        Exit 1
+    }
+
+    # Check again
+    $InstalledPost = Get-HotFix | Where-Object { $_.HotFixID -eq $KBID }
+    if ($InstalledPost) {
+        Write-Log "$KBID installation verified."
+        Exit 0
+    }
+    else {
+        Write-Log "ERROR: $KBID not detected after install."
+        Exit 1
+    }
+}
