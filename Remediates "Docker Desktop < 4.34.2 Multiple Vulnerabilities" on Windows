@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Remediates "Docker Desktop < 4.34.2 Multiple Vulnerabilities" on Windows.
+  Remediates "Update Docker Desktop < 4.34.2 Multiple Vulnerabilities" on Windows.
 
 .DESCRIPTION
   - Checks installed Docker Desktop version.
